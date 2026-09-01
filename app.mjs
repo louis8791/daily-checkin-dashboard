@@ -80,7 +80,7 @@ function inferRelayDate(text) {
 }
 
 function normaliseName(value) {
-  return String(value).replace(/\s+/gu, '').trim();
+  return String(value).replace(/[\[\]【】]/gu, '').replace(/\s+/gu, '').trim();
 }
 
 function parseRelay(text, roster = members) {

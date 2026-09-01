@@ -8,6 +8,7 @@ assert.equal(getWeekIndex('2026-10-13'), -1);
 assert.equal(getTotalDaysThrough('2026-09-01'), 15);
 assert.equal(inferRelayDate('2026/08/25 今日接龍'), '2026-08-25');
 assert.equal(inferRelayDate('8月25日 今日接龍'), '2026-08-25');
+assert.equal(inferRelayDate('8/19（三）我已完成'), '2026-08-19');
 assert.equal(inferRelayDate('今天接龍'), null);
 
 const testRoster = [{ id: 'm01', name: 'Person A' }, { id: 'm02', name: 'Person B' }];
@@ -15,6 +16,9 @@ const parsed = parseRelay('today\n1.Person A\n2. Person A\n3.Person B\n4.Unknown
 assert.deepEqual(parsed.names, ['Person A', 'Person B']);
 assert.deepEqual(parsed.duplicates, ['PersonA']);
 assert.deepEqual(parsed.unknown, ['Unknown']);
+const pastedShape = parseRelay('[daily slogan\n8/19（三）我已完成\n1.A\n2.B]', [{ id: 'm01', name: 'A' }, { id: 'm02', name: 'B' }]);
+assert.deepEqual(pastedShape.names, ['A', 'B']);
+assert.deepEqual(pastedShape.unknown, []);
 
 const stats = calculateStats({
   roster: testRoster,
