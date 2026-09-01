@@ -2,15 +2,31 @@ const START_DATE = '2026-08-18';
 const END_DATE = '2026-10-12';
 const DEMO_AS_OF = '2026-09-01';
 
-export const members = [
-  ['m01', '小明'], ['m02', '小王'], ['m03', '老陳'], ['m04', '小安'], ['m05', '阿庭'],
-  ['m06', '小宇'], ['m07', '阿哲'], ['m08', '小晴'], ['m09', '阿岑'], ['m10', '小潔'],
-].map(([id, name]) => ({ id, name }));
+const ROSTER_KEY = 'daily-checkin-roster-v1';
+const DATA_KEY = 'daily-checkin-data-v1';
 
-const weeklyFixture = [
-  [7, 7, 1], [6, 7, 1], [5, 6, 1], [4, 5, 1], [7, 4, 1],
-  [3, 6, 0], [6, 5, 1], [2, 4, 1], [5, 3, 0], [4, 7, 1],
-];
+function loadRoster() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const stored = JSON.parse(localStorage.getItem(ROSTER_KEY) || '[]');
+    if (!Array.isArray(stored)) return [];
+    return stored.filter((name) => typeof name === 'string' && name.trim()).slice(0, 10)
+      .map((name, index) => ({ id: `m${String(index + 1).padStart(2, '0')}`, name: name.trim() }));
+  } catch { return []; }
+}
+
+export let members = loadRoster();
+
+function loadSavedData() {
+  if (typeof localStorage === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(DATA_KEY) || '{}'); } catch { return {}; }
+}
+
+function persistData() {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(ROSTER_KEY, JSON.stringify(members.map((member) => member.name)));
+  localStorage.setItem(DATA_KEY, JSON.stringify({ records: state.records, importedDays: state.importedDays, asOf: state.asOf, rawInputs: state.rawInputs }));
+}
 
 export function parseDate(value) {
   const [year, month, day] = String(value).split('-').map(Number);
@@ -79,13 +95,14 @@ function toSet(value) {
   return value instanceof Set ? value : new Set(value || []);
 }
 
-export function calculateStats({ roster = members, records = {}, importedDays = [], asOf = DEMO_AS_OF } = {}) {
+export function calculateStats({ roster = members, records = {}, importedDays = [], asOf = null } = {}) {
+  const effectiveAsOf = asOf || addDays(START_DATE, -1);
   const imported = new Set(importedDays);
-  const elapsedDays = getTotalDaysThrough(asOf);
+  const elapsedDays = getTotalDaysThrough(effectiveAsOf);
   const weekStats = Array.from({ length: 8 }, (_, weekIndex) => {
     const dates = getWeekDates(weekIndex);
-    const available = dates.filter((date) => date <= asOf).length;
-    return { weekIndex, dates, available, complete: available === 7, sourceMissing: dates.filter((date) => date <= asOf && !imported.has(date)) };
+    const available = dates.filter((date) => date <= effectiveAsOf).length;
+    return { weekIndex, dates, available, complete: available === 7, sourceMissing: dates.filter((date) => date <= effectiveAsOf && !imported.has(date)) };
   });
   const people = roster.map((member) => {
     const weekly = weekStats.map((week) => {
@@ -93,7 +110,7 @@ export function calculateStats({ roster = members, records = {}, importedDays = 
       return { count, total: week.available, rate: week.available ? count / week.available : null };
     });
     const count = Object.entries(records).reduce((sum, [date, ids]) => {
-      if (date <= asOf && toSet(ids).has(member.id)) return sum + 1;
+      if (date <= effectiveAsOf && toSet(ids).has(member.id)) return sum + 1;
       return sum;
     }, 0);
     return { ...member, weekly, count, total: elapsedDays, rate: elapsedDays ? count / elapsedDays : null };
@@ -104,27 +121,20 @@ export function calculateStats({ roster = members, records = {}, importedDays = 
 function buildFixture() {
   const records = {};
   const importedDays = [];
-  const asOf = DEMO_AS_OF;
-  for (let offset = 0; offset < getTotalDaysThrough(asOf); offset += 1) importedDays.push(addDays(START_DATE, offset));
-  members.forEach((member, personIndex) => {
-    weeklyFixture[personIndex].forEach((count, weekIndex) => {
-      getWeekDates(weekIndex).slice(0, count).forEach((date) => {
-        if (date > asOf) return;
-        records[date] ||= [];
-        if (!records[date].includes(member.id)) records[date].push(member.id);
-      });
-    });
-  });
-  return { records, importedDays, asOf };
+  return { records, importedDays, asOf: null };
 }
 
+const saved = loadSavedData();
 const demo = buildFixture();
 const state = {
   ...demo,
+  records: saved.records || demo.records,
+  importedDays: saved.importedDays || demo.importedDays,
+  asOf: saved.asOf || demo.asOf,
+  rawInputs: saved.rawInputs || {},
   selectedWeek: 2,
   selectedPerson: 'm01',
   selectedDate: DEMO_AS_OF,
-  rawInputs: {},
   preview: null,
 };
 
@@ -150,7 +160,7 @@ function weekLabel(index) { return `第${index + 1}週`; }
 function currentStats() { return calculateStats({ roster: members, records: state.records, importedDays: state.importedDays, asOf: state.asOf }); }
 
 function renderHeader(stats) {
-  $('#last-updated').textContent = `示範資料・截至 ${formatDate(stats.asOf, true)}`;
+  $('#last-updated').textContent = stats.asOf ? `本機資料・截至 ${formatDate(stats.asOf, true)}` : '本機資料・尚未匯入';
   const asOf = $('#as-of-label');
   if (asOf) asOf.textContent = formatDate(stats.asOf, true);
 }
@@ -193,8 +203,8 @@ function svgLineChart(person, stats, compact = false) {
 
 function renderLineChart(stats) {
   const person = stats.people.find((item) => item.id === state.selectedPerson) || stats.people[0];
-  $('#overview-line-chart').innerHTML = svgLineChart(person, stats);
-  $('#overview-person').value = person.id;
+  $('#overview-line-chart').innerHTML = person ? svgLineChart(person, stats) : '<div class="empty-state">先在每日紀錄設定本機名冊。</div>';
+  if (person) $('#overview-person').value = person.id;
 }
 
 function renderRanking(stats) {
@@ -216,6 +226,12 @@ function renderWeekly(stats) {
 
 function renderPerson(stats) {
   const person = stats.people.find((item) => item.id === state.selectedPerson) || stats.people[0];
+  if (!person) {
+    $('#person-summary').innerHTML = '<div class="empty-state">先在每日紀錄設定本機名冊。</div>';
+    $('#people-line-chart').innerHTML = '<div class="empty-state">尚未有可顯示的個人資料。</div>';
+    $('#person-calendar').innerHTML = '';
+    return;
+  }
   $('#people-person').value = person.id;
   $('#person-summary').innerHTML = `<div><span>累積完成</span><strong>${person.count} 次</strong></div><div><span>目前總次數</span><strong>${person.total} 次</strong></div><div><span>達成率</span><strong>${pct(person.rate)}</strong></div>`;
   $('#people-line-chart').innerHTML = svgLineChart(person);
@@ -225,16 +241,20 @@ function renderPerson(stats) {
 
 function renderDaily(stats) {
   $('#entry-date').value = state.selectedDate;
+  const rosterInput = $('#roster-input');
+  if (rosterInput && document.activeElement !== rosterInput) rosterInput.value = members.map((member) => member.name).join('\n');
+  const rosterStatus = $('#roster-status');
+  if (rosterStatus) rosterStatus.textContent = members.length === 10 ? '已設定 10 人・只存在本機' : `目前 ${members.length} 人，請設定 10 人`;
   const parsed = parseRelay(state.rawInputs[state.selectedDate] || '', members);
   const confirmed = toSet(state.records[state.selectedDate]);
   const rows = members.map((person) => `<tr><td>${escapeHtml(person.name)}</td><td>${confirmed.has(person.id) ? '<span class="state-dot is-done"></span>已接龍' : '<span class="state-dot"></span>尚未接龍'}</td></tr>`).join('');
   const recentRows = state.importedDays.slice(-7).reverse().map((date) => `<tr><td>${formatDate(date, true)}</td><td>${weekLabel(getWeekIndex(date))}</td><td class="numeric">${toSet(state.records[date]).size}</td><td><span class="status-pill is-done">已匯入</span></td><td>${formatDate(date)}</td></tr>`).join('');
   $('#recent-days-body').innerHTML = recentRows;
-  $('#relay-input').value = state.rawInputs[state.selectedDate] || `每天都要一起完成，今天也要一起加油：\n1.小明\n2.小王\n3.老陳\n4.小安`;
+  $('#relay-input').value = state.rawInputs[state.selectedDate] || '';
   if (state.preview) renderPreview(state.preview);
   else $('#preview-content').innerHTML = '<div class="empty-icon" aria-hidden="true">⌁</div><strong>還沒有待確認內容</strong><p>貼上接龍後，這裡會列出已辨識與需要留意的項目。</p>';
   const helper = document.querySelector('.helper-text');
-  if (helper) helper.textContent = stats.sourceMissing.includes(state.selectedDate) ? '這一天尚未匯入來源，尚不計入統計。' : '請只在示範資料中使用假名。';
+  if (helper) helper.textContent = stats.sourceMissing.includes(state.selectedDate) ? '這一天尚未匯入來源，尚不計入統計。' : '資料只在此瀏覽器處理。';
 }
 
 function renderPreview(result) {
@@ -265,13 +285,21 @@ function bindEvents() {
   $('#overview-person').addEventListener('change', (event) => { state.selectedPerson = event.target.value; renderAll(); });
   $('#people-person').addEventListener('change', (event) => { state.selectedPerson = event.target.value; renderAll(); });
   $('#entry-date').addEventListener('change', (event) => { state.selectedDate = event.target.value; state.preview = null; renderDaily(currentStats()); });
+  $('#save-roster').addEventListener('click', () => {
+    const names = $('#roster-input').value.split(/\r?\n/u).map((name) => name.trim()).filter(Boolean);
+    const unique = [...new Set(names)];
+    if (unique.length !== 10) { toast('請輸入 10 位不重複成員姓名。', 'info'); return; }
+    members = unique.map((name, index) => ({ id: `m${String(index + 1).padStart(2, '0')}`, name }));
+    state.records = {}; state.importedDays = []; state.asOf = null; state.rawInputs = {}; state.selectedPerson = members[0].id; state.preview = null;
+    persistData(); renderAll(); toast('本機名冊已儲存，姓名沒有離開這台裝置。', 'success');
+  });
   $('#preview-entry').addEventListener('click', () => { state.preview = parseRelay($('#relay-input').value, members); renderPreview(state.preview); });
   $('#apply-entry').addEventListener('click', () => {
     if (!state.preview || state.preview.unknown.length || state.preview.isEmpty) return;
     state.records[state.selectedDate] = [...state.preview.ids];
     if (!state.importedDays.includes(state.selectedDate)) state.importedDays.push(state.selectedDate);
     state.importedDays.sort(); state.rawInputs[state.selectedDate] = $('#relay-input').value; state.asOf = state.selectedDate > state.asOf ? state.selectedDate : state.asOf; state.preview = null;
-    renderAll(); toast(`${formatDate(state.selectedDate, true)} 已更新，繼續累積！`, 'success');
+    persistData(); renderAll(); toast(`${formatDate(state.selectedDate, true)} 已更新，繼續累積！`, 'success');
   });
   $('#export-pdf').addEventListener('click', () => { window.print(); });
   $('#copy-summary').addEventListener('click', async () => {
