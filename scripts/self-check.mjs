@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
-import { calculateStats, getTotalDaysThrough, getWeekIndex, parseRelay } from '../app.mjs';
+await import('../app.mjs');
+const { calculateStats, getTotalDaysThrough, getWeekIndex, inferRelayDate, parseRelay } = globalThis.CheckinCore;
 
 assert.equal(getWeekIndex('2026-08-18'), 0);
 assert.equal(getWeekIndex('2026-10-12'), 7);
 assert.equal(getWeekIndex('2026-10-13'), -1);
 assert.equal(getTotalDaysThrough('2026-09-01'), 15);
+assert.equal(inferRelayDate('2026/08/25 今日接龍'), '2026-08-25');
+assert.equal(inferRelayDate('8月25日 今日接龍'), '2026-08-25');
+assert.equal(inferRelayDate('今天接龍'), null);
 
 const testRoster = [{ id: 'm01', name: 'Person A' }, { id: 'm02', name: 'Person B' }];
 const parsed = parseRelay('today\n1.Person A\n2. Person A\n3.Person B\n4.Unknown', testRoster);

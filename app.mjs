@@ -15,7 +15,7 @@ function loadRoster() {
   } catch { return []; }
 }
 
-export let members = loadRoster();
+let members = loadRoster();
 
 function loadSavedData() {
   if (typeof localStorage === 'undefined') return {};
@@ -28,34 +28,34 @@ function persistData() {
   localStorage.setItem(DATA_KEY, JSON.stringify({ records: state.records, importedDays: state.importedDays, asOf: state.asOf, rawInputs: state.rawInputs }));
 }
 
-export function parseDate(value) {
+function parseDate(value) {
   const [year, month, day] = String(value).split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-export function dateKey(date) {
+function dateKey(date) {
   return date.toISOString().slice(0, 10);
 }
 
-export function addDays(value, amount) {
+function addDays(value, amount) {
   const date = typeof value === 'string' ? parseDate(value) : new Date(value);
   date.setUTCDate(date.getUTCDate() + amount);
   return dateKey(date);
 }
 
-export function getWeekIndex(value) {
+function getWeekIndex(value) {
   const start = parseDate(START_DATE);
   const target = parseDate(value);
   const diff = Math.floor((target - start) / 86400000);
   return diff >= 0 && diff < 56 ? Math.floor(diff / 7) : -1;
 }
 
-export function getWeekDates(weekIndex) {
+function getWeekDates(weekIndex) {
   if (weekIndex < 0 || weekIndex > 7) return [];
   return Array.from({ length: 7 }, (_, day) => addDays(START_DATE, weekIndex * 7 + day));
 }
 
-export function getTotalDaysThrough(value) {
+function getTotalDaysThrough(value) {
   const start = parseDate(START_DATE);
   const end = parseDate(END_DATE);
   const target = parseDate(value);
@@ -63,11 +63,27 @@ export function getTotalDaysThrough(value) {
   return Math.min(56, Math.floor((Math.min(target, end) - start) / 86400000) + 1);
 }
 
+function inferRelayDate(text) {
+  const source = String(text || '');
+  const candidates = [];
+  const full = source.match(/(20\d{2})\s*[\/\.\-年]\s*(\d{1,2})\s*[\/\.\-月]\s*(\d{1,2})\s*日?/u);
+  if (full) candidates.push(`${full[1]}-${String(full[2]).padStart(2, '0')}-${String(full[3]).padStart(2, '0')}`);
+  const chinese = source.match(/(?:^|[^\d])(\d{1,2})\s*月\s*(\d{1,2})\s*日?/u);
+  if (chinese) candidates.push(`2026-${String(chinese[1]).padStart(2, '0')}-${String(chinese[2]).padStart(2, '0')}`);
+  const short = source.match(/(?:^|[^\d])(\d{1,2})\s*[\/\.\-]\s*(\d{1,2})(?:[^\d]|$)/u);
+  if (short) candidates.push(`2026-${String(short[1]).padStart(2, '0')}-${String(short[2]).padStart(2, '0')}`);
+  const date = candidates.find((candidate) => {
+    const parsed = parseDate(candidate);
+    return dateKey(parsed) === candidate && getWeekIndex(candidate) >= 0;
+  });
+  return date || null;
+}
+
 function normaliseName(value) {
   return String(value).replace(/\s+/gu, '').trim();
 }
 
-export function parseRelay(text, roster = members) {
+function parseRelay(text, roster = members) {
   const byName = new Map(roster.map((member) => [normaliseName(member.name), member]));
   const names = [];
   const ids = [];
@@ -95,7 +111,7 @@ function toSet(value) {
   return value instanceof Set ? value : new Set(value || []);
 }
 
-export function calculateStats({ roster = members, records = {}, importedDays = [], asOf = null } = {}) {
+function calculateStats({ roster = members, records = {}, importedDays = [], asOf = null } = {}) {
   const effectiveAsOf = asOf || addDays(START_DATE, -1);
   const imported = new Set(importedDays);
   const elapsedDays = getTotalDaysThrough(effectiveAsOf);
@@ -136,6 +152,7 @@ const state = {
   selectedPerson: 'm01',
   selectedDate: DEMO_AS_OF,
   preview: null,
+  previewDate: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -162,7 +179,7 @@ function currentStats() { return calculateStats({ roster: members, records: stat
 function renderHeader(stats) {
   $('#last-updated').textContent = stats.asOf ? `本機資料・截至 ${formatDate(stats.asOf, true)}` : '本機資料・尚未匯入';
   const asOf = $('#as-of-label');
-  if (asOf) asOf.textContent = formatDate(stats.asOf, true);
+  if (asOf) asOf.textContent = stats.asOf ? formatDate(stats.asOf, true) : '尚未匯入';
 }
 
 function renderMetrics(stats) {
@@ -259,7 +276,9 @@ function renderDaily(stats) {
 
 function renderPreview(result) {
   const missing = members.filter((member) => !result.ids.includes(member.id)).map((member) => member.name);
-  $('#preview-content').innerHTML = `<div class="preview-summary"><strong>辨識到 ${result.names.length} 人</strong><span>重複 ${result.duplicates.length} 筆</span><span>待確認 ${result.unknown.length} 筆</span></div><div class="preview-lists"><p><b>已辨識：</b>${result.names.length ? result.names.map(escapeHtml).join('、') : '—'}</p><p><b>同日未出現：</b>${missing.map(escapeHtml).join('、') || '—'}</p>${result.duplicates.length ? `<p class="notice"><b>重複姓名：</b>${result.duplicates.map(escapeHtml).join('、')}（只計一次）</p>` : ''}${result.unknown.length ? `<p class="warning"><b>無法辨識：</b>${result.unknown.map(escapeHtml).join('、')}；請檢查是否為名冊中的假名。</p>` : ''}</div>`;
+  const dateNote = state.previewDate ? `<p class="notice"><b>日期已辨識：</b>${formatDate(state.previewDate, true)}；仍可在上方修改後再確認。</p>` : '<p class="warning"><b>未找到日期：</b>請確認上方紀錄日期，系統不會自行猜測。</p>';
+  $('#preview-content').innerHTML = `<div class="preview-summary"><strong>辨識到 ${result.names.length} 人</strong><span>重複 ${result.duplicates.length} 筆</span><span>待確認 ${result.unknown.length} 筆</span></div><div class="preview-lists">${dateNote}<p><b>已辨識：</b>${result.names.length ? result.names.map(escapeHtml).join('、') : '—'}</p><p><b>同日未出現：</b>${missing.map(escapeHtml).join('、') || '—'}</p>${result.duplicates.length ? `<p class="notice"><b>重複姓名：</b>${result.duplicates.map(escapeHtml).join('、')}（只計一次）</p>` : ''}${result.unknown.length ? `<p class="warning"><b>無法辨識：</b>${result.unknown.map(escapeHtml).join('、')}；請檢查是否為名冊中的假名。</p>` : ''}</div>`;
+  $('#preview-status').textContent = result.unknown.length ? '需要留意' : state.previewDate ? '日期已判斷' : '請確認日期';
   $('#apply-entry').disabled = result.isEmpty || result.unknown.length > 0;
 }
 
@@ -284,31 +303,36 @@ function bindEvents() {
   $('#weekly-week').addEventListener('change', (event) => { state.selectedWeek = Number(event.target.value); renderAll(); });
   $('#overview-person').addEventListener('change', (event) => { state.selectedPerson = event.target.value; renderAll(); });
   $('#people-person').addEventListener('change', (event) => { state.selectedPerson = event.target.value; renderAll(); });
-  $('#entry-date').addEventListener('change', (event) => { state.selectedDate = event.target.value; state.preview = null; renderDaily(currentStats()); });
+  $('#entry-date').addEventListener('change', (event) => { state.selectedDate = event.target.value; state.preview = null; state.previewDate = null; renderDaily(currentStats()); });
   $('#save-roster').addEventListener('click', () => {
     const names = $('#roster-input').value.split(/\r?\n/u).map((name) => name.trim()).filter(Boolean);
     const unique = [...new Set(names)];
     if (unique.length !== 10) { toast('請輸入 10 位不重複成員姓名。', 'info'); return; }
     members = unique.map((name, index) => ({ id: `m${String(index + 1).padStart(2, '0')}`, name }));
-    state.records = {}; state.importedDays = []; state.asOf = null; state.rawInputs = {}; state.selectedPerson = members[0].id; state.preview = null;
+    state.records = {}; state.importedDays = []; state.asOf = null; state.rawInputs = {}; state.selectedPerson = members[0].id; state.preview = null; state.previewDate = null;
     persistData(); renderAll(); toast('本機名冊已儲存，姓名沒有離開這台裝置。', 'success');
   });
-  $('#preview-entry').addEventListener('click', () => { state.preview = parseRelay($('#relay-input').value, members); renderPreview(state.preview); });
+  $('#preview-entry').addEventListener('click', () => {
+    if (members.length !== 10) { toast('請先設定 10 人本機名冊，再預覽接龍。', 'info'); return; }
+    state.previewDate = inferRelayDate($('#relay-input').value);
+    if (state.previewDate) { state.selectedDate = state.previewDate; $('#entry-date').value = state.previewDate; }
+    state.preview = parseRelay($('#relay-input').value, members); renderPreview(state.preview);
+  });
   $('#apply-entry').addEventListener('click', () => {
     if (!state.preview || state.preview.unknown.length || state.preview.isEmpty) return;
     state.records[state.selectedDate] = [...state.preview.ids];
     if (!state.importedDays.includes(state.selectedDate)) state.importedDays.push(state.selectedDate);
-    state.importedDays.sort(); state.rawInputs[state.selectedDate] = $('#relay-input').value; state.asOf = state.selectedDate > state.asOf ? state.selectedDate : state.asOf; state.preview = null;
+    state.importedDays.sort(); state.rawInputs[state.selectedDate] = $('#relay-input').value; state.asOf = !state.asOf || state.selectedDate > state.asOf ? state.selectedDate : state.asOf; state.preview = null; state.previewDate = null;
     persistData(); renderAll(); toast(`${formatDate(state.selectedDate, true)} 已更新，繼續累積！`, 'success');
   });
   $('#export-pdf').addEventListener('click', () => { window.print(); });
   $('#copy-summary').addEventListener('click', async () => {
-    const stats = currentStats(); const text = `打卡累積｜截至 ${formatDate(stats.asOf, true)}\n團體完成 ${stats.people.reduce((sum, person) => sum + person.count, 0)} 次｜團體達成率 ${pct(stats.people.reduce((sum, person) => sum + person.count, 0) / (members.length * stats.elapsedDays))}`;
+    const stats = currentStats(); const asOf = stats.asOf ? `截至 ${formatDate(stats.asOf, true)}` : '尚未匯入資料'; const total = stats.people.reduce((sum, person) => sum + person.count, 0); const text = `打卡累積｜${asOf}\n團體完成 ${total} 次｜團體達成率 ${pct(members.length * stats.elapsedDays ? total / (members.length * stats.elapsedDays) : null)}`;
     try { await navigator.clipboard.writeText(text); toast('摘要已複製，可以貼到群組。', 'success'); } catch { toast('目前無法自動複製，請直接選取畫面文字。', 'info'); }
   });
 }
 
-export { buildFixture };
+if (typeof globalThis !== 'undefined') globalThis.CheckinCore = { parseDate, dateKey, addDays, getWeekIndex, getWeekDates, getTotalDaysThrough, inferRelayDate, parseRelay, calculateStats, buildFixture };
 
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
