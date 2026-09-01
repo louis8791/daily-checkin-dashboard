@@ -1,0 +1,38 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*secret*
+*token*
+
+# Real or exported data must never enter the public repository
+data/
+private-data/
+exports/
+backups/
+uploads/
+reports/
+evidence/
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.db
+*.sqlite
+*.sqlite3
+*.pdf
+*.zip
+*.7z
+*.bak
+*.log
+
+# Local tool output
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.tmp/
+tmp/
