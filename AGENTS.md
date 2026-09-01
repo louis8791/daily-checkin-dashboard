@@ -41,7 +41,7 @@ Run Note 與 Change Log 只提供歷史證據，不得取代目前權威。
 - 真實姓名、別名、名冊、每日接龍、每日完成狀態、統計結果、PDF、截圖、備份、匯出檔及解密金鑰，禁止進入本 repo。
 - 真實資料只可寫入 `E:\打卡\private-data` 或正式系統的加密資料區，不得複製到 repo 內測試。
 - 不把真實姓名貼入任何 AI、LLM、提示詞、issue、commit message、CI log、分析服務或錯誤回報。
-- 開發、測試、截圖與文件一律使用「小明、小王、老陳」等明確假名。
+- 開發、測試、截圖與文件只使用合成字串或明確假名；本機正式使用者輸入的姓名不得回填到公開 source。
 - 任何無法確認是否含真實資料的檔案，一律不得 stage、commit 或 push。
 
 ## Product Contract
@@ -68,7 +68,8 @@ Run Note 與 Change Log 只提供歷史證據，不得取代目前權威。
 
 ## State Boundary
 
-- `fixture`：公開 repo 內的假名測試資料。
+- `fixture`：公開 repo 內的合成測試字串與數值；原型不預填姓名或日紀錄。
+- `browser-local`：使用者在本機頁面輸入的名冊、接龍與統計，僅存瀏覽器 `localStorage`，不得送入 AI 或公開 repo。
 - `private-data`：repo 外的真實名冊與接龍資料。
 - `runtime encrypted data`：正式網站僅保存加密內容；伺服器不得取得姓名明文。
 - `exports`：使用者裝置產生的 PDF／匯出檔，不回存公開 repo。
@@ -99,3 +100,9 @@ Run Note 與 Change Log 只提供歷史證據，不得取代目前權威。
 - 原始接龍缺失、解析異常、未知姓名、重複資料、解密失敗或 PDF 產生失敗時，必須顯示原因並停止寫入。
 - 自動測試通過不等於手機與群組實際使用已驗收。
 - source、build、部署、群組入口與 Owner 驗收必須分開回報。
+
+## Current Prototype Boundary
+
+- `index.html`、`styles.css`、`app.mjs` 是可在本機瀏覽器執行的原型；一般腳本載入支援直接檔案入口，HTTP 本機入口仍是主要驗收入口。
+- 原型可在每日頁設定 10 人本機名冊、貼上接龍、預覽、去重、阻擋未知項目並自動判斷常見日期格式；找不到日期時必須由使用者確認。
+- 原型沒有模型輔助、登入、正式加密、雲端同步、群組唯讀權限或五種正式 PDF 報表；不得把本機 self-check／smoke test 當成上述功能完成。
