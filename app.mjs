@@ -315,16 +315,19 @@ function bindEvents() {
   $('#people-person').addEventListener('change', (event) => { state.selectedPerson = event.target.value; renderAll(); });
   $('#preview-entry').addEventListener('click', () => {
     state.previewDate = inferRelayDate($('#relay-input').value);
+    if (state.previewDate) state.selectedDate = state.previewDate;
     state.preview = parseRelay($('#relay-input').value, members); renderPreview(state.preview);
   });
   $('#apply-entry').addEventListener('click', () => {
-    if (!state.preview || state.preview.unknown.length || state.preview.isEmpty) return;
-    state.records[state.selectedDate] = [...state.preview.ids];
+    if (!state.preview || !state.previewDate || state.preview.unknown.length || state.preview.isEmpty) return;
+    const date = state.previewDate;
+    state.selectedDate = date;
+    state.records[date] = [...state.preview.ids];
     const known = new Set(members.map((member) => normaliseName(member.name)));
     state.preview.newNames.forEach((name) => { if (!known.has(normaliseName(name))) { members.push({ id: `m${String(members.length + 1).padStart(2, '0')}`, name }); known.add(normaliseName(name)); } });
-    if (!state.importedDays.includes(state.selectedDate)) state.importedDays.push(state.selectedDate);
-    state.importedDays.sort(); state.rawInputs[state.selectedDate] = $('#relay-input').value; state.asOf = !state.asOf || state.selectedDate > state.asOf ? state.selectedDate : state.asOf; state.preview = null; state.previewDate = null;
-    persistData(); renderAll(); toast(`${formatDate(state.selectedDate, true)} 已更新，繼續累積！`, 'success');
+    if (!state.importedDays.includes(date)) state.importedDays.push(date);
+    state.importedDays.sort(); state.rawInputs[date] = $('#relay-input').value; state.asOf = !state.asOf || date > state.asOf ? date : state.asOf; state.preview = null; state.previewDate = null;
+    persistData(); renderAll(); toast(`${formatDate(date, true)} 已更新，繼續累積！`, 'success');
   });
   $('#export-pdf').addEventListener('click', () => { window.print(); });
   $('#copy-summary').addEventListener('click', async () => {
