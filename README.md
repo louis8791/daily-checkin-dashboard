@@ -18,6 +18,10 @@ node scripts/self-check.mjs
 
 姓名與紀錄只存在瀏覽器 localStorage，不會送到 AI 或 GitHub；請把姓名直接輸入本機頁面，不要貼到聊天視窗。PDF 按鈕會開啟瀏覽器列印／另存 PDF，正式五種報表與手機下載流程列在 Phase 3。
 
+### 如何自行確認 AI 看不到
+
+公開 source 沒有 AI API、分析工具、`fetch`、WebSocket 或外部資料庫寫入；姓名只由瀏覽器內的 JavaScript 解析並寫入本機 `localStorage`。因此姓名不會離開裝置。唯一例外是把姓名貼進聊天視窗，或日後把含姓名的截圖／檔案交給外部服務；這兩件事請避免。
+
 ## 核心原則
 
 - 正式產品不使用 AI 模型或 AI API。
