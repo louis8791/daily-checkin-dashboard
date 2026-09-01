@@ -83,28 +83,40 @@ function normaliseName(value) {
   return String(value).replace(/[\[\]【】]/gu, '').replace(/\s+/gu, '').trim();
 }
 
+function displayName(value) {
+  return String(value).replace(/[\[\]【】]/gu, '').replace(/\s+/gu, ' ').trim();
+}
+
+function numberedNames(text) {
+  const source = String(text || '').trim().replace(/^\s*[\[]/u, '').replace(/[\]]\s*$/u, '');
+  return source.split(/\r?\n/u)
+    .map((line) => line.match(/^\s*\d+\s*[.．、)]\s*(.+?)\s*$/u))
+    .filter(Boolean)
+    .map((match) => displayName(match[1]))
+    .filter(Boolean);
+}
+
 function parseRelay(text, roster = members) {
   const byName = new Map(roster.map((member) => [normaliseName(member.name), member]));
   const names = [];
   const ids = [];
   const duplicates = [];
-  const unknown = [];
-  const numbered = String(text || '').split(/\r?\n/u)
-    .map((line) => line.match(/^\s*\d+\s*[.．、)]\s*(.+?)\s*$/u))
-    .filter(Boolean)
-    .map((match) => normaliseName(match[1]));
+  const newNames = [];
+  const numbered = numberedNames(text);
+  let nextId = roster.length;
   for (const name of numbered) {
-    const member = byName.get(name);
-    if (!member) {
-      unknown.push(name);
-    } else if (ids.includes(member.id)) {
+    const key = normaliseName(name);
+    const member = byName.get(key);
+    if (member && ids.includes(member.id)) {
       duplicates.push(name);
     } else {
-      ids.push(member.id);
-      names.push(member.name);
+      const resolved = member || { id: `m${String(nextId += 1).padStart(2, '0')}`, name };
+      if (!member) { byName.set(key, resolved); newNames.push(name); }
+      ids.push(resolved.id);
+      names.push(resolved.name);
     }
   }
-  return { names, ids, duplicates, unknown, isEmpty: numbered.length === 0 };
+  return { names, ids, duplicates, unknown: [], newNames, isEmpty: numbered.length === 0 };
 }
 
 function toSet(value) {
@@ -257,12 +269,6 @@ function renderPerson(stats) {
 }
 
 function renderDaily(stats) {
-  $('#entry-date').value = state.selectedDate;
-  const rosterInput = $('#roster-input');
-  if (rosterInput && document.activeElement !== rosterInput) rosterInput.value = members.map((member) => member.name).join('\n');
-  const rosterStatus = $('#roster-status');
-  if (rosterStatus) rosterStatus.textContent = members.length === 10 ? '已設定 10 人・只存在本機' : `目前 ${members.length} 人，請設定 10 人`;
-  const parsed = parseRelay(state.rawInputs[state.selectedDate] || '', members);
   const confirmed = toSet(state.records[state.selectedDate]);
   const rows = members.map((person) => `<tr><td>${escapeHtml(person.name)}</td><td>${confirmed.has(person.id) ? '<span class="state-dot is-done"></span>已接龍' : '<span class="state-dot"></span>尚未接龍'}</td></tr>`).join('');
   const recentRows = state.importedDays.slice(-7).reverse().map((date) => `<tr><td>${formatDate(date, true)}</td><td>${weekLabel(getWeekIndex(date))}</td><td class="numeric">${toSet(state.records[date]).size}</td><td><span class="status-pill is-done">已匯入</span></td><td>${formatDate(date)}</td></tr>`).join('');
@@ -276,10 +282,11 @@ function renderDaily(stats) {
 
 function renderPreview(result) {
   const missing = members.filter((member) => !result.ids.includes(member.id)).map((member) => member.name);
-  const dateNote = state.previewDate ? `<p class="notice"><b>日期已辨識：</b>${formatDate(state.previewDate, true)}；仍可在上方修改後再確認。</p>` : '<p class="warning"><b>未找到日期：</b>請確認上方紀錄日期，系統不會自行猜測。</p>';
-  $('#preview-content').innerHTML = `<div class="preview-summary"><strong>辨識到 ${result.names.length} 人</strong><span>重複 ${result.duplicates.length} 筆</span><span>待確認 ${result.unknown.length} 筆</span></div><div class="preview-lists">${dateNote}<p><b>已辨識：</b>${result.names.length ? result.names.map(escapeHtml).join('、') : '—'}</p><p><b>同日未出現：</b>${missing.map(escapeHtml).join('、') || '—'}</p>${result.duplicates.length ? `<p class="notice"><b>重複姓名：</b>${result.duplicates.map(escapeHtml).join('、')}（只計一次）</p>` : ''}${result.unknown.length ? `<p class="warning"><b>無法辨識：</b>${result.unknown.map(escapeHtml).join('、')}；請檢查是否為名冊中的假名。</p>` : ''}</div>`;
-  $('#preview-status').textContent = result.unknown.length ? '需要留意' : state.previewDate ? '日期已判斷' : '請確認日期';
-  $('#apply-entry').disabled = result.isEmpty || result.unknown.length > 0;
+  const dateNote = state.previewDate ? `<p class="notice"><b>日期已辨識：</b>${formatDate(state.previewDate, true)}；系統會以這一天入帳。</p>` : '<p class="warning"><b>未找到日期：</b>請在原文中保留日期，系統不會自行猜測。</p>';
+  const newNote = result.newNames.length ? `<p class="notice"><b>本次新辨識：</b>${result.newNames.map(escapeHtml).join('、')}（會留在本機索引）</p>` : '';
+  $('#preview-content').innerHTML = `<div class="preview-summary"><strong>辨識到 ${result.names.length} 人</strong><span>重複 ${result.duplicates.length} 筆</span></div><div class="preview-lists">${dateNote}${newNote}<p><b>已辨識：</b>${result.names.length ? result.names.map(escapeHtml).join('、') : '—'}</p><p><b>既有成員本次未出現：</b>${missing.map(escapeHtml).join('、') || '—'}</p>${result.duplicates.length ? `<p class="notice"><b>重複姓名：</b>${result.duplicates.map(escapeHtml).join('、')}（只計一次）</p>` : ''}</div>`;
+  $('#preview-status').textContent = result.isEmpty ? '找不到編號姓名' : state.previewDate ? '日期已判斷' : '需要日期';
+  $('#apply-entry').disabled = result.isEmpty || !state.previewDate;
 }
 
 function renderRecentDays() { /* daily view renders the recent-days table */ }
@@ -303,24 +310,15 @@ function bindEvents() {
   $('#weekly-week').addEventListener('change', (event) => { state.selectedWeek = Number(event.target.value); renderAll(); });
   $('#overview-person').addEventListener('change', (event) => { state.selectedPerson = event.target.value; renderAll(); });
   $('#people-person').addEventListener('change', (event) => { state.selectedPerson = event.target.value; renderAll(); });
-  $('#entry-date').addEventListener('change', (event) => { state.selectedDate = event.target.value; state.preview = null; state.previewDate = null; renderDaily(currentStats()); });
-  $('#save-roster').addEventListener('click', () => {
-    const names = $('#roster-input').value.split(/\r?\n/u).map((name) => name.trim()).filter(Boolean);
-    const unique = [...new Set(names)];
-    if (unique.length !== 10) { toast('請輸入 10 位不重複成員姓名。', 'info'); return; }
-    members = unique.map((name, index) => ({ id: `m${String(index + 1).padStart(2, '0')}`, name }));
-    state.records = {}; state.importedDays = []; state.asOf = null; state.rawInputs = {}; state.selectedPerson = members[0].id; state.preview = null; state.previewDate = null;
-    persistData(); renderAll(); toast('本機名冊已儲存，姓名沒有離開這台裝置。', 'success');
-  });
   $('#preview-entry').addEventListener('click', () => {
-    if (members.length !== 10) { toast('請先設定 10 人本機名冊，再預覽接龍。', 'info'); return; }
     state.previewDate = inferRelayDate($('#relay-input').value);
-    if (state.previewDate) { state.selectedDate = state.previewDate; $('#entry-date').value = state.previewDate; }
     state.preview = parseRelay($('#relay-input').value, members); renderPreview(state.preview);
   });
   $('#apply-entry').addEventListener('click', () => {
     if (!state.preview || state.preview.unknown.length || state.preview.isEmpty) return;
     state.records[state.selectedDate] = [...state.preview.ids];
+    const known = new Set(members.map((member) => normaliseName(member.name)));
+    state.preview.newNames.forEach((name) => { if (!known.has(normaliseName(name))) { members.push({ id: `m${String(members.length + 1).padStart(2, '0')}`, name }); known.add(normaliseName(name)); } });
     if (!state.importedDays.includes(state.selectedDate)) state.importedDays.push(state.selectedDate);
     state.importedDays.sort(); state.rawInputs[state.selectedDate] = $('#relay-input').value; state.asOf = !state.asOf || state.selectedDate > state.asOf ? state.selectedDate : state.asOf; state.preview = null; state.previewDate = null;
     persistData(); renderAll(); toast(`${formatDate(state.selectedDate, true)} 已更新，繼續累積！`, 'success');

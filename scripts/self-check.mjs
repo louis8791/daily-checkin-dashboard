@@ -13,12 +13,17 @@ assert.equal(inferRelayDate('今天接龍'), null);
 
 const testRoster = [{ id: 'm01', name: 'Person A' }, { id: 'm02', name: 'Person B' }];
 const parsed = parseRelay('today\n1.Person A\n2. Person A\n3.Person B\n4.Unknown', testRoster);
-assert.deepEqual(parsed.names, ['Person A', 'Person B']);
-assert.deepEqual(parsed.duplicates, ['PersonA']);
-assert.deepEqual(parsed.unknown, ['Unknown']);
+assert.deepEqual(parsed.names, ['Person A', 'Person B', 'Unknown']);
+assert.deepEqual(parsed.duplicates, ['Person A']);
+assert.deepEqual(parsed.unknown, []);
+assert.deepEqual(parsed.newNames, ['Unknown']);
 const pastedShape = parseRelay('[daily slogan\n8/19（三）我已完成\n1.A\n2.B]', [{ id: 'm01', name: 'A' }, { id: 'm02', name: 'B' }]);
 assert.deepEqual(pastedShape.names, ['A', 'B']);
 assert.deepEqual(pastedShape.unknown, []);
+const autoRoster = parseRelay('[daily slogan\n8/19（三）我已完成\n1.A\n2.B]', []);
+assert.deepEqual(autoRoster.names, ['A', 'B']);
+assert.deepEqual(autoRoster.ids, ['m01', 'm02']);
+assert.deepEqual(autoRoster.newNames, ['A', 'B']);
 
 const stats = calculateStats({
   roster: testRoster,

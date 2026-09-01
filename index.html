@@ -142,15 +142,12 @@
 
           <section class="view-panel" id="view-daily" data-panel="daily">
             <div class="section-heading-row"><div><p class="eyebrow teal">DAILY CHECK-IN</p><h2>貼上今天的接龍</h2><p>先預覽辨識結果，確認後才會更新統計。</p></div><div class="date-lock"><span class="status-dot amber"></span>每日截止 23:59（台灣時間）</div></div>
-            <article class="panel-card roster-card"><div class="panel-heading"><div><p class="eyebrow">PRIVATE ON THIS DEVICE</p><h3>先設定本機名冊</h3></div><span class="demo-chip">不會上傳</span></div><p class="helper-text">每行一人，最多 10 人。這裡輸入的姓名只保存在本機瀏覽器；不要貼到聊天視窗。</p><textarea id="roster-input" rows="4" placeholder="每行輸入一位成員姓名"></textarea><div class="input-footer"><span class="helper-text" id="roster-status">尚未設定名冊</span><button class="button button-primary" id="save-roster" type="button">儲存本機名冊</button></div></article>
             <div class="daily-layout">
               <article class="panel-card input-card">
-                <div class="panel-heading"><div><p class="eyebrow">01 / PASTE</p><h3>選日期與貼上內容</h3></div><span class="demo-chip">本機資料</span></div>
-                <label class="field-label" for="entry-date">紀錄日期</label>
-                <input class="date-input" id="entry-date" type="date" value="2026-09-01" min="2026-08-18" max="2026-10-12" />
+                <div class="panel-heading"><div><p class="eyebrow">01 / PASTE</p><h3>直接貼上完整內容</h3></div><span class="demo-chip">日期自動辨識</span></div>
                 <label class="field-label" for="relay-input">接龍內容</label>
                 <textarea id="relay-input" rows="10" placeholder="貼上完整接龍內容"></textarea>
-                <div class="input-footer"><span class="helper-text">資料只在此瀏覽器處理。</span><button class="button button-primary" id="preview-entry" type="button">預覽辨識 <span aria-hidden="true">→</span></button></div>
+                <div class="input-footer"><span class="helper-text">保留標語、日期行與編號姓名即可；資料只在此瀏覽器處理。</span><button class="button button-primary" id="preview-entry" type="button">預覽辨識 <span aria-hidden="true">→</span></button></div>
               </article>
               <article class="panel-card preview-card">
                 <div class="panel-heading"><div><p class="eyebrow">02 / REVIEW</p><h3>確認後才會入帳</h3></div><span class="status-pill neutral" id="preview-status">等待貼上</span></div>
