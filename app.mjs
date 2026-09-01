@@ -232,7 +232,7 @@ function svgLineChart(person, stats, compact = false) {
 
 function renderLineChart(stats) {
   const person = stats.people.find((item) => item.id === state.selectedPerson) || stats.people[0];
-  $('#overview-line-chart').innerHTML = person ? svgLineChart(person, stats) : '<div class="empty-state">先在每日紀錄設定本機名冊。</div>';
+  $('#overview-line-chart').innerHTML = person ? svgLineChart(person, stats) : '<div class="empty-state">先在每日紀錄貼上一份接龍原文。</div>';
   if (person) $('#overview-person').value = person.id;
 }
 
@@ -256,7 +256,7 @@ function renderWeekly(stats) {
 function renderPerson(stats) {
   const person = stats.people.find((item) => item.id === state.selectedPerson) || stats.people[0];
   if (!person) {
-    $('#person-summary').innerHTML = '<div class="empty-state">先在每日紀錄設定本機名冊。</div>';
+    $('#person-summary').innerHTML = '<div class="empty-state">先在每日紀錄貼上一份接龍原文。</div>';
     $('#people-line-chart').innerHTML = '<div class="empty-state">尚未有可顯示的個人資料。</div>';
     $('#person-calendar').innerHTML = '';
     return;
@@ -283,9 +283,9 @@ function renderDaily(stats) {
 function renderPreview(result) {
   const missing = members.filter((member) => !result.ids.includes(member.id)).map((member) => member.name);
   const dateNote = state.previewDate ? `<p class="notice"><b>日期已辨識：</b>${formatDate(state.previewDate, true)}；系統會以這一天入帳。</p>` : '<p class="warning"><b>未找到日期：</b>請在原文中保留日期，系統不會自行猜測。</p>';
-  const newNote = result.newNames.length ? `<p class="notice"><b>本次新辨識：</b>${result.newNames.map(escapeHtml).join('、')}（會留在本機索引）</p>` : '';
+  const newNote = result.newNames.length ? `<p class="notice"><b>本次新辨識：</b>${result.newNames.map(escapeHtml).join('、')}（只留在本機）</p>` : '';
   $('#preview-content').innerHTML = `<div class="preview-summary"><strong>辨識到 ${result.names.length} 人</strong><span>重複 ${result.duplicates.length} 筆</span></div><div class="preview-lists">${dateNote}${newNote}<p><b>已辨識：</b>${result.names.length ? result.names.map(escapeHtml).join('、') : '—'}</p><p><b>既有成員本次未出現：</b>${missing.map(escapeHtml).join('、') || '—'}</p>${result.duplicates.length ? `<p class="notice"><b>重複姓名：</b>${result.duplicates.map(escapeHtml).join('、')}（只計一次）</p>` : ''}</div>`;
-  $('#preview-status').textContent = result.isEmpty ? '找不到編號姓名' : state.previewDate ? '日期已判斷' : '需要日期';
+  $('#preview-status').textContent = result.isEmpty ? '找不到編號姓名' : state.previewDate ? '日期已判斷' : '原文需含日期';
   $('#apply-entry').disabled = result.isEmpty || !state.previewDate;
 }
 
@@ -293,6 +293,9 @@ function renderRecentDays() { /* daily view renders the recent-days table */ }
 
 function renderAll() {
   const stats = currentStats();
+  const personOptions = members.map((member) => `<option value="${member.id}">${escapeHtml(member.name)}</option>`).join('');
+  $('#overview-person').innerHTML = personOptions;
+  $('#people-person').innerHTML = personOptions;
   renderHeader(stats); renderMetrics(stats); renderOverviewTable(stats); renderWeeklyHighlight(stats); renderLineChart(stats); renderRanking(stats); renderWeekly(stats); renderPerson(stats); renderDaily(stats); renderRecentDays();
 }
 
